@@ -4,7 +4,7 @@ import java.net.InetAddress;
 
 public interface PeerIdentity {
 
-    public long getIdntifier();
+    public long getIdentifier();
 
     public ListenerMode getListenerMode();
 

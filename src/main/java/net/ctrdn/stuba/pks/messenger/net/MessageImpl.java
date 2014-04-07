@@ -1,7 +1,6 @@
 package net.ctrdn.stuba.pks.messenger.net;
 
 import java.io.ByteArrayOutputStream;
-import java.io.UnsupportedEncodingException;
 import java.net.InetAddress;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
@@ -119,12 +118,6 @@ public class MessageImpl implements Message {
         for (MessageFragment fragment : this.messageFragmentList) {
             baos.write(fragment.getData(), 0, fragment.getData().length);
         }
-        try {
-            return baos.toString("UTF-8").getBytes("UTF-8");
-        } catch (UnsupportedEncodingException ex) {
-            MessageException finalEx = new MessageException("Unable to resolve charset.");
-            finalEx.addSuppressed(ex);
-            throw finalEx;
-        }
+        return baos.toByteArray();
     }
 }

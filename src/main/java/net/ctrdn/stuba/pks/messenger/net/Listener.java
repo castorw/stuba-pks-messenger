@@ -134,7 +134,7 @@ public class Listener implements Runnable {
                                     }
 
                                     @Override
-                                    public long getIdntifier() {
+                                    public long getIdentifier() {
                                         return peerIdentifier;
                                     }
                                 };
@@ -201,7 +201,7 @@ public class Listener implements Runnable {
         }
     }
 
-    public void sendMessage(PeerIdentity target, int mtu, String message) throws ListenerException {
+    public int sendMessage(PeerIdentity target, int mtu, String message) throws ListenerException {
         if (this.mode != ListenerMode.CLIENT) {
             throw new ListenerException("Messages can be only sent in client mode");
         }
@@ -239,6 +239,7 @@ public class Listener implements Runnable {
                 DatagramPacket txPacket = new DatagramPacket(txBuffer, txBuffer.length, target.getInetAddress(), target.getPort());
                 this.socket.send(txPacket);
             }
+            return fragmentCount;
         } catch (IOException ex) {
             ListenerException finalEx = new ListenerException("Failed to transmit packet");
             finalEx.addSuppressed(ex);
@@ -248,7 +249,7 @@ public class Listener implements Runnable {
 
     private void broadcastIdentity(boolean active) throws IOException {
         this.lastIdentityBroadcast = new Date();
-        byte[] identifierBytes = ByteBuffer.allocate(Long.SIZE / 8).putLong(this.localIdentity.getIdntifier()).array();
+        byte[] identifierBytes = ByteBuffer.allocate(Long.SIZE / 8).putLong(this.localIdentity.getIdentifier()).array();
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         baos.write(ProtocolConstants.MSG_TYPE_IDENTITY);
         baos.write(identifierBytes, 0, identifierBytes.length);
@@ -264,9 +265,17 @@ public class Listener implements Runnable {
             for (InterfaceAddress ifaddress : nic.getInterfaceAddresses()) {
                 InetAddress broadcastAddress = ifaddress.getBroadcast();
                 if (broadcastAddress != null && !ifaddress.getAddress().isLoopbackAddress()) {
-                    DatagramPacket identityPacket = new DatagramPacket(identityData, identityData.length, broadcastAddress, this.localIdentity.getPort());
-                    this.getSocket().send(identityPacket);
-                    count++;
+                    try {
+                        DatagramPacket identityPacket = new DatagramPacket(identityData, identityData.length, broadcastAddress, this.localIdentity.getPort());
+                        this.getSocket().send(identityPacket);
+                        count++;
+                    } catch (IOException ex) {
+                        if (ex.getMessage().equalsIgnoreCase("host is down") || ex.getMessage().equalsIgnoreCase("no route to host")) {
+                            this.logMessage("Failed to broadcast to " + broadcastAddress.getHostAddress() + ": " + ex.getMessage());
+                        } else {
+                            throw ex;
+                        }
+                    }
                 }
             }
         }

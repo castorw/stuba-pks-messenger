@@ -4,14 +4,10 @@ import com.google.common.base.Preconditions;
 import java.awt.Window;
 import java.io.UnsupportedEncodingException;
 import java.lang.reflect.Method;
-import java.net.Inet4Address;
 import java.net.InetAddress;
-import java.net.InterfaceAddress;
 import java.net.NetworkInterface;
-import java.net.SocketException;
 import java.util.ArrayList;
 import java.util.Date;
-import java.util.Enumeration;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
@@ -41,14 +37,13 @@ public class MainFrame extends javax.swing.JFrame {
 
         @Override
         public void onListenerStarted(ListenerMode mode) {
-            mf.comboInterfaceList.setEnabled(false);
             mf.comboMode.setEnabled(false);
             mf.fieldPort.setEnabled(false);
             mf.fieldIdentity.setEnabled(false);
             mf.buttonControl.setText("Stop");
             mf.labelStatus.setText("Running (" + mode.toString() + ")");
             mf.labelAddress.setText("0.0.0.0:" + mf.fieldPort.getText());
-            mf.logMessage("[Listener] Listener has started in mode " + mode.toString() + " on 0.0.0.0:" + mf.fieldPort.getText() + " with identifier " + mf.listener.getLocalIdentity().getIdntifier());
+            mf.logMessage("[Listener] Listener has started in mode " + mode.toString() + " on 0.0.0.0:" + mf.fieldPort.getText() + " with identifier " + mf.listener.getLocalIdentity().getIdentifier());
 
             if (mode == ListenerMode.CLIENT) {
                 mf.fieldMessage.setEnabled(true);
@@ -59,7 +54,6 @@ public class MainFrame extends javax.swing.JFrame {
 
         @Override
         public void onListenerStopped() {
-            mf.comboInterfaceList.setEnabled(true);
             mf.comboMode.setEnabled(true);
             mf.fieldPort.setEnabled(true);
             mf.fieldIdentity.setEnabled(true);
@@ -94,15 +88,15 @@ public class MainFrame extends javax.swing.JFrame {
 
         @Override
         public void onIdentityBroadcastReceived(PeerIdentity peerIdentity) {
-            mf.logMessage("[Listener] Identity packet received (address=" + peerIdentity.getInetAddress().getHostAddress() + ", port=" + peerIdentity.getPort() + ", ident=" + peerIdentity.getIdntifier() + ", name=" + peerIdentity.getPeerName() + ", mode=" + peerIdentity.getListenerMode().toString() + " status=" + peerIdentity.getPeerStatus().toString() + ")");
-            if (peerIdentity.getIdntifier() == mf.listener.getLocalIdentity().getIdntifier()) {
+            mf.logMessage("[Listener] Identity packet received (address=" + peerIdentity.getInetAddress().getHostAddress() + ", port=" + peerIdentity.getPort() + ", ident=" + peerIdentity.getIdentifier() + ", name=" + peerIdentity.getPeerName() + ", mode=" + peerIdentity.getListenerMode().toString() + " status=" + peerIdentity.getPeerStatus().toString() + ")");
+            if (peerIdentity.getIdentifier() == mf.listener.getLocalIdentity().getIdentifier()) {
                 mf.logMessage("[Listener] Identity from self - ignored");
                 return;
             }
             boolean updateNeeded = false;
             PeerIdentity foundPeerIdentity = null;
             for (PeerIdentity currentId : this.peerIdentityList) {
-                if (currentId.getIdntifier() == peerIdentity.getIdntifier()) {
+                if (currentId.getIdentifier() == peerIdentity.getIdentifier()) {
                     foundPeerIdentity = currentId;
                     break;
                 }
@@ -211,29 +205,6 @@ public class MainFrame extends javax.swing.JFrame {
         }
     }
 
-    private void enumerateNetworkInterfaces() {
-        this.networkInterfaceList.clear();
-        DefaultComboBoxModel nicComboModel = new DefaultComboBoxModel();
-        try {
-            for (Enumeration<NetworkInterface> en = NetworkInterface.getNetworkInterfaces(); en.hasMoreElements();) {
-                NetworkInterface nic = en.nextElement();
-                this.networkInterfaceList.add(nic);
-                String address = "n/a";
-                for (Enumeration<InetAddress> ae = nic.getInetAddresses(); ae.hasMoreElements();) {
-                    InetAddress inetAddress = ae.nextElement();
-                    if (Inet4Address.class.isAssignableFrom(inetAddress.getClass())) {
-                        address = inetAddress.getHostAddress();
-                        break;
-                    }
-                }
-                nicComboModel.addElement(nic.getDisplayName() + "( " + address + ")");
-            }
-            this.comboInterfaceList.setModel(nicComboModel);
-        } catch (SocketException ex) {
-            this.handleException(ex);
-        }
-    }
-
     private void enumerateModes() {
         DefaultComboBoxModel modeComboModel = new DefaultComboBoxModel();
         modeComboModel.addElement("Server (Receiver)");
@@ -242,7 +213,6 @@ public class MainFrame extends javax.swing.JFrame {
     }
 
     public void initialize() {
-        this.enumerateNetworkInterfaces();
         this.enumerateModes();
 
         this.fieldMessage.setEnabled(false);
@@ -268,8 +238,6 @@ public class MainFrame extends javax.swing.JFrame {
         buttonGroup5 = new javax.swing.ButtonGroup();
         jSplitPane1 = new javax.swing.JSplitPane();
         jPanel1 = new javax.swing.JPanel();
-        jLabel1 = new javax.swing.JLabel();
-        comboInterfaceList = new javax.swing.JComboBox();
         jLabel2 = new javax.swing.JLabel();
         comboMode = new javax.swing.JComboBox();
         jLabel3 = new javax.swing.JLabel();
@@ -308,10 +276,6 @@ public class MainFrame extends javax.swing.JFrame {
 
         jPanel1.setMinimumSize(new java.awt.Dimension(250, 100));
 
-        jLabel1.setText("Interface:");
-
-        comboInterfaceList.setModel(new javax.swing.DefaultComboBoxModel(new String[] { "Item 1", "Item 2", "Item 3", "Item 4" }));
-
         jLabel2.setText("Mode:");
 
         comboMode.setModel(new javax.swing.DefaultComboBoxModel(new String[] { "Item 1", "Item 2", "Item 3", "Item 4" }));
@@ -333,7 +297,7 @@ public class MainFrame extends javax.swing.JFrame {
             }
         });
 
-        jLabel5.setText("Available receivers:");
+        jLabel5.setText("Neighbors:");
 
         listReceivers.setModel(new javax.swing.AbstractListModel() {
             String[] strings = { };
@@ -378,10 +342,6 @@ public class MainFrame extends javax.swing.JFrame {
                             .addComponent(jToolBar1, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
                             .addComponent(jScrollPane1)
                             .addGroup(jPanel1Layout.createSequentialGroup()
-                                .addComponent(jLabel1)
-                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                                .addComponent(comboInterfaceList, 0, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
-                            .addGroup(jPanel1Layout.createSequentialGroup()
                                 .addComponent(jLabel2)
                                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                                 .addComponent(comboMode, 0, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
@@ -393,27 +353,23 @@ public class MainFrame extends javax.swing.JFrame {
                                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                                 .addComponent(fieldPort))
                             .addGroup(jPanel1Layout.createSequentialGroup()
+                                .addComponent(jLabel9)
+                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                                .addComponent(fieldIdentity))
+                            .addGroup(jPanel1Layout.createSequentialGroup()
                                 .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                                     .addComponent(jLabel5)
                                     .addGroup(jPanel1Layout.createSequentialGroup()
                                         .addComponent(jLabel4)
                                         .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                                         .addComponent(labelAddress, javax.swing.GroupLayout.PREFERRED_SIZE, 231, javax.swing.GroupLayout.PREFERRED_SIZE)))
-                                .addGap(0, 0, Short.MAX_VALUE))
-                            .addGroup(jPanel1Layout.createSequentialGroup()
-                                .addComponent(jLabel9)
-                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                                .addComponent(fieldIdentity)))
+                                .addGap(0, 0, Short.MAX_VALUE)))
                         .addContainerGap())))
         );
         jPanel1Layout.setVerticalGroup(
             jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(jPanel1Layout.createSequentialGroup()
                 .addContainerGap()
-                .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
-                    .addComponent(jLabel1)
-                    .addComponent(comboInterfaceList, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
-                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                 .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
                     .addComponent(jLabel2)
                     .addComponent(comboMode, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
@@ -438,7 +394,7 @@ public class MainFrame extends javax.swing.JFrame {
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                 .addComponent(jLabel5)
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                .addComponent(jScrollPane1, javax.swing.GroupLayout.DEFAULT_SIZE, 216, Short.MAX_VALUE)
+                .addComponent(jScrollPane1, javax.swing.GroupLayout.DEFAULT_SIZE, 249, Short.MAX_VALUE)
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                 .addComponent(jToolBar1, javax.swing.GroupLayout.PREFERRED_SIZE, 25, javax.swing.GroupLayout.PREFERRED_SIZE)
                 .addContainerGap())
@@ -455,6 +411,7 @@ public class MainFrame extends javax.swing.JFrame {
 
         textareaMessage.setEditable(false);
         textareaMessage.setColumns(20);
+        textareaMessage.setLineWrap(true);
         textareaMessage.setRows(5);
         jScrollPane2.setViewportView(textareaMessage);
 
@@ -462,6 +419,14 @@ public class MainFrame extends javax.swing.JFrame {
         jToolBar2.setRollover(true);
 
         fieldMessage.setText("enter message here...");
+        fieldMessage.addFocusListener(new java.awt.event.FocusAdapter() {
+            public void focusGained(java.awt.event.FocusEvent evt) {
+                fieldMessageFocusGained(evt);
+            }
+            public void focusLost(java.awt.event.FocusEvent evt) {
+                fieldMessageFocusLost(evt);
+            }
+        });
         jToolBar2.add(fieldMessage);
 
         spinnerMtu.setMinimumSize(new java.awt.Dimension(80, 28));
@@ -566,17 +531,6 @@ public class MainFrame extends javax.swing.JFrame {
     private void buttonControlActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_buttonControlActionPerformed
         if (this.listener == null) {
             final ListenerMode mode = (((String) this.comboMode.getSelectedItem()).startsWith("Server")) ? ListenerMode.SERVER : ListenerMode.CLIENT;
-            InterfaceAddress ifaceAddress = null;
-
-            NetworkInterface nic = this.networkInterfaceList.get(this.comboInterfaceList.getSelectedIndex());
-            for (InterfaceAddress ifaceAddr : nic.getInterfaceAddresses()) {
-                InetAddress currentInetAddress = ifaceAddr.getAddress();
-                InetAddress currentBroadcastAddress = ifaceAddr.getBroadcast();
-                if (currentBroadcastAddress != null && currentInetAddress != null) {
-                    ifaceAddress = ifaceAddr;
-                    break;
-                }
-            }
             final String localName = this.fieldIdentity.getText();
             final int localPort = Integer.parseInt(this.fieldPort.getText());
             final long finalIdent = new Random(new Date().getTime()).nextLong();
@@ -609,7 +563,7 @@ public class MainFrame extends javax.swing.JFrame {
                 }
 
                 @Override
-                public long getIdntifier() {
+                public long getIdentifier() {
                     return finalIdent;
                 }
             };
@@ -639,11 +593,29 @@ public class MainFrame extends javax.swing.JFrame {
             if (target.getListenerMode() == ListenerMode.CLIENT) {
                 throw new UserInterfaceException("You cannot send message to client (C), only to server (S).");
             }
-            this.listener.sendMessage(target, (Integer) this.spinnerMtu.getValue(), this.fieldMessage.getText());
+            int fragments = this.listener.sendMessage(target, (Integer) this.spinnerMtu.getValue(), this.fieldMessage.getText());
+            this.textareaMessage.append("[Sent message to " + target.getPeerName() + " (" + target.getInetAddress().getHostAddress() + ":" + target.getPort() + ") in " + fragments + " fragments]\n" + this.fieldMessage.getText() + "\n\n");
+            if (this.fieldMessage.isFocusOwner()) {
+                this.fieldMessage.setText("");
+            } else {
+                this.fieldMessage.setText("enter message here...");
+            }
         } catch (UserInterfaceException | ListenerException ex) {
             this.handleException(ex);
         }
     }//GEN-LAST:event_buttonSendActionPerformed
+
+    private void fieldMessageFocusGained(java.awt.event.FocusEvent evt) {//GEN-FIRST:event_fieldMessageFocusGained
+        if (this.fieldMessage.getText().equals("enter message here...")) {
+            this.fieldMessage.setText("");
+        }
+    }//GEN-LAST:event_fieldMessageFocusGained
+
+    private void fieldMessageFocusLost(java.awt.event.FocusEvent evt) {//GEN-FIRST:event_fieldMessageFocusLost
+        if (this.fieldMessage.getText().equals("")) {
+            this.fieldMessage.setText("enter message here...");
+        }
+    }//GEN-LAST:event_fieldMessageFocusLost
 
 
     // Variables declaration - do not modify//GEN-BEGIN:variables
@@ -655,13 +627,11 @@ public class MainFrame extends javax.swing.JFrame {
     private javax.swing.ButtonGroup buttonGroup4;
     private javax.swing.ButtonGroup buttonGroup5;
     private javax.swing.JButton buttonSend;
-    private javax.swing.JComboBox comboInterfaceList;
     private javax.swing.JComboBox comboMode;
     private javax.swing.JTextField fieldIdentity;
     private javax.swing.JTextField fieldIpAddress;
     private javax.swing.JTextField fieldMessage;
     private javax.swing.JTextField fieldPort;
-    private javax.swing.JLabel jLabel1;
     private javax.swing.JLabel jLabel2;
     private javax.swing.JLabel jLabel3;
     private javax.swing.JLabel jLabel4;
