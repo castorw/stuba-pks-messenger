@@ -1,5 +1,6 @@
 package net.ctrdn.stuba.pks.messenger.net;
 
+import net.ctrdn.stuba.pks.messenger.net.listener.ListenerMode;
 import java.net.InetAddress;
 
 public interface PeerIdentity {

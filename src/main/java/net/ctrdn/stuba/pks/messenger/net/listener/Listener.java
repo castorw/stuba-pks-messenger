@@ -1,4 +1,4 @@
-package net.ctrdn.stuba.pks.messenger.net;
+package net.ctrdn.stuba.pks.messenger.net.listener;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -20,23 +20,26 @@ import java.util.Random;
 import net.ctrdn.stuba.pks.messenger.Helpers;
 import net.ctrdn.stuba.pks.messenger.exception.ListenerException;
 import net.ctrdn.stuba.pks.messenger.exception.MessageException;
+import net.ctrdn.stuba.pks.messenger.net.message.Message;
+import net.ctrdn.stuba.pks.messenger.net.message.MessageImpl;
+import net.ctrdn.stuba.pks.messenger.net.PeerIdentity;
+import net.ctrdn.stuba.pks.messenger.net.PeerStatus;
+import net.ctrdn.stuba.pks.messenger.net.ProtocolConstants;
 
 public class Listener implements Runnable {
 
-    private final ListenerMode mode;
     private final PeerIdentity localIdentity;
-    private final List<ListenerEventCallback> eventCallbackList = new ArrayList<>();
+    private final List<ListenerCallback> eventCallbackList = new ArrayList<>();
     private boolean running = false;
     private DatagramSocket socket;
     private Date lastIdentityBroadcast = null;
 
     private final List<Message> messageList = new ArrayList<>();
 
-    public Listener(PeerIdentity localIdentity, ListenerMode mode) throws ListenerException {
+    public Listener(PeerIdentity localIdentity) throws ListenerException {
         try {
             this.localIdentity = localIdentity;
-            this.mode = mode;
-            this.socket = new DatagramSocket(this.getLocalIdentity().getPort());
+            this.socket = new DatagramSocket(this.localIdentity.getPort());
         } catch (SocketException ex) {
             ListenerException finalEx = new ListenerException("Failed to start UDP listener: " + ex.getMessage());
             finalEx.addSuppressed(ex);
@@ -44,7 +47,7 @@ public class Listener implements Runnable {
         }
     }
 
-    public void addEventCallback(ListenerEventCallback callback) {
+    public void addCallback(ListenerCallback callback) {
         this.eventCallbackList.add(callback);
     }
 
@@ -54,13 +57,13 @@ public class Listener implements Runnable {
             this.getSocket().setSoTimeout(1000);
             this.getSocket().setBroadcast(true);
             this.running = true;
-            for (ListenerEventCallback callback : this.eventCallbackList) {
-                callback.onListenerStarted(this.getMode());
+            for (ListenerCallback callback : this.eventCallbackList) {
+                callback.onListenerStarted(this);
             }
             while (this.running) {
                 try {
-                    for (ListenerEventCallback callback : this.eventCallbackList) {
-                        callback.onListenerTick();
+                    for (ListenerCallback callback : this.eventCallbackList) {
+                        callback.onListenerTick(this);
                     }
                     if (this.lastIdentityBroadcast == null || new Date().getTime() - this.lastIdentityBroadcast.getTime() > 5000) {
                         this.broadcastIdentity(running);
@@ -80,8 +83,8 @@ public class Listener implements Runnable {
                     }
                     if (removeMessage != null) {
                         this.messageList.remove(removeMessage);
-                        for (ListenerEventCallback callback : this.eventCallbackList) {
-                            callback.onMessageReceived(removeMessage);
+                        for (ListenerCallback callback : this.eventCallbackList) {
+                            callback.onMessageReceived(this, removeMessage);
                         }
                     }
 
@@ -138,12 +141,16 @@ public class Listener implements Runnable {
                                         return peerIdentifier;
                                     }
                                 };
-                                for (ListenerEventCallback callback : this.eventCallbackList) {
-                                    callback.onIdentityBroadcastReceived(remoteIdentity);
+                                for (ListenerCallback callback : this.eventCallbackList) {
+                                    callback.onIdentityBroadcastReceived(this, remoteIdentity);
                                 }
                                 break;
                             }
                             case ProtocolConstants.MSG_TYPE_MESSAGE: {
+                                if (this.getLocalIdentity().getListenerMode() == ListenerMode.CLIENT) {
+                                    this.logMessage("Cannot received message in client mode (message from " + recvPacket.getAddress().getHostAddress() + ":" + recvPacket.getPort() + ")");
+                                    break;
+                                }
                                 try {
                                     ByteBuffer wrappedSequenceId = ByteBuffer.wrap(recvPacket.getData(), 1, Long.SIZE / 8);
                                     long sequenceId = wrappedSequenceId.getLong();
@@ -163,8 +170,8 @@ public class Listener implements Runnable {
                                     this.logMessage("Added frame " + message.getReceivedFrameCount() + " of " + message.getTotalFragmentCount() + " to message SEQ_ID " + sequenceId);
                                     if (message.getReceivedFrameCount() == message.getTotalFragmentCount()) {
                                         this.logMessage("Message SEQ_ID " + sequenceId + " received complete (fragments=" + message.getTotalFragmentCount() + ")");
-                                        for (ListenerEventCallback callback : this.eventCallbackList) {
-                                            callback.onMessageReceived(message);
+                                        for (ListenerCallback callback : this.eventCallbackList) {
+                                            callback.onMessageReceived(this, message);
                                         }
                                         this.messageList.remove(message);
                                     }
@@ -195,14 +202,14 @@ public class Listener implements Runnable {
             } catch (IOException ex) {
                 Helpers.showExceptionMessage(ex);
             }
-            for (ListenerEventCallback callback : this.eventCallbackList) {
-                callback.onListenerStopped();
+            for (ListenerCallback callback : this.eventCallbackList) {
+                callback.onListenerStopped(this);
             }
         }
     }
 
     public int sendMessage(PeerIdentity target, int mtu, String message) throws ListenerException {
-        if (this.mode != ListenerMode.CLIENT) {
+        if (this.getLocalIdentity().getListenerMode() != ListenerMode.CLIENT) {
             throw new ListenerException("Messages can be only sent in client mode");
         }
         try {
@@ -248,12 +255,12 @@ public class Listener implements Runnable {
     }
 
     private void broadcastIdentity(boolean active) throws IOException {
-        this.lastIdentityBroadcast = new Date();
+        // construct identity packet --- 1B MSG_TYPE + 8B IDENT + 1B MODE + 1B STATUS + 1B NAME_LEN + nB NAME
         byte[] identifierBytes = ByteBuffer.allocate(Long.SIZE / 8).putLong(this.localIdentity.getIdentifier()).array();
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         baos.write(ProtocolConstants.MSG_TYPE_IDENTITY);
         baos.write(identifierBytes, 0, identifierBytes.length);
-        baos.write((this.mode == ListenerMode.CLIENT) ? ProtocolConstants.IDENTITY_CLIENT : ProtocolConstants.IDENTITY_SERVER);
+        baos.write((this.getLocalIdentity().getListenerMode() == ListenerMode.CLIENT) ? ProtocolConstants.IDENTITY_CLIENT : ProtocolConstants.IDENTITY_SERVER);
         baos.write((active) ? ProtocolConstants.IDENTITY_ACTIVE : ProtocolConstants.IDENTITY_LEAVING);
         baos.write((byte) this.getLocalIdentity().getPeerName().length());
         baos.write(this.getLocalIdentity().getPeerName().getBytes("UTF-8"), 0, this.getLocalIdentity().getPeerName().getBytes().length);
@@ -279,12 +286,13 @@ public class Listener implements Runnable {
                 }
             }
         }
-        this.logMessage("Broadcasted identity packet on " + count + " addresses");
+        this.lastIdentityBroadcast = new Date();
+        this.logMessage("Broadcast identity packet on " + count + " addresses");
     }
 
     private void logMessage(String message) {
-        for (ListenerEventCallback callback : this.eventCallbackList) {
-            callback.onListenerLogEvent(message);
+        for (ListenerCallback callback : this.eventCallbackList) {
+            callback.onListenerLogEvent(this, message);
         }
     }
 
@@ -298,9 +306,5 @@ public class Listener implements Runnable {
 
     public DatagramSocket getSocket() {
         return socket;
-    }
-
-    public ListenerMode getMode() {
-        return mode;
     }
 }

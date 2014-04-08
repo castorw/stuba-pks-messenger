@@ -1,4 +1,4 @@
-package net.ctrdn.stuba.pks.messenger.net;
+package net.ctrdn.stuba.pks.messenger.net.message;
 
 import java.net.InetAddress;
 import java.util.Date;

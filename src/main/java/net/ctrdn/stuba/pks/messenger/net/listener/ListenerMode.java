@@ -1,4 +1,4 @@
-package net.ctrdn.stuba.pks.messenger.net;
+package net.ctrdn.stuba.pks.messenger.net.listener;
 
 public enum ListenerMode {
 

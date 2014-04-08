@@ -1,18 +1,6 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 
 <Form version="1.3" maxVersion="1.9" type="org.netbeans.modules.form.forminfo.JFrameFormInfo">
-  <NonVisualComponents>
-    <Component class="javax.swing.ButtonGroup" name="buttonGroup1">
-    </Component>
-    <Component class="javax.swing.ButtonGroup" name="buttonGroup2">
-    </Component>
-    <Component class="javax.swing.ButtonGroup" name="buttonGroup3">
-    </Component>
-    <Component class="javax.swing.ButtonGroup" name="buttonGroup4">
-    </Component>
-    <Component class="javax.swing.ButtonGroup" name="buttonGroup5">
-    </Component>
-  </NonVisualComponents>
   <Properties>
     <Property name="defaultCloseOperation" type="int" value="3"/>
   </Properties>
@@ -82,7 +70,7 @@
                                   <Group type="102" alignment="0" attributes="0">
                                       <Component id="jLabel2" min="-2" max="-2" attributes="0"/>
                                       <EmptySpace max="-2" attributes="0"/>
-                                      <Component id="comboMode" max="32767" attributes="0"/>
+                                      <Component id="comboBoxMode" max="32767" attributes="0"/>
                                   </Group>
                                   <Group type="102" alignment="1" attributes="0">
                                       <EmptySpace min="0" pref="0" max="32767" attributes="0"/>
@@ -122,7 +110,7 @@
                       <EmptySpace max="-2" attributes="0"/>
                       <Group type="103" groupAlignment="3" attributes="0">
                           <Component id="jLabel2" alignment="3" min="-2" max="-2" attributes="0"/>
-                          <Component id="comboMode" alignment="3" min="-2" max="-2" attributes="0"/>
+                          <Component id="comboBoxMode" alignment="3" min="-2" max="-2" attributes="0"/>
                       </Group>
                       <EmptySpace max="-2" attributes="0"/>
                       <Group type="103" groupAlignment="3" attributes="0">
@@ -163,7 +151,7 @@
                 <Property name="text" type="java.lang.String" value="Mode:"/>
               </Properties>
             </Component>
-            <Component class="javax.swing.JComboBox" name="comboMode">
+            <Component class="javax.swing.JComboBox" name="comboBoxMode">
               <Properties>
                 <Property name="model" type="javax.swing.ComboBoxModel" editor="org.netbeans.modules.form.editors2.ComboBoxModelEditor">
                   <StringArray count="4">
@@ -221,7 +209,7 @@
 
               <Layout class="org.netbeans.modules.form.compat2.layouts.support.JScrollPaneSupportLayout"/>
               <SubComponents>
-                <Component class="javax.swing.JList" name="listReceivers">
+                <Component class="javax.swing.JList" name="listNeighbors">
                   <Properties>
                     <Property name="model" type="javax.swing.ListModel" editor="org.netbeans.modules.form.RADConnectionPropertyEditor">
                       <Connection code="new javax.swing.AbstractListModel() {&#xa;    String[] strings = { };&#xa;    public int getSize() { return strings.length; }&#xa;    public Object getElementAt(int i) { return strings[i]; }&#xa;}" type="code"/>
@@ -240,8 +228,12 @@
               <SubComponents>
                 <Component class="javax.swing.JTextField" name="fieldIpAddress">
                   <Properties>
-                    <Property name="text" type="java.lang.String" value="enter IPv4 address"/>
+                    <Property name="text" type="java.lang.String" value="enter ip:port to add server..."/>
                   </Properties>
+                  <Events>
+                    <EventHandler event="focusGained" listener="java.awt.event.FocusListener" parameters="java.awt.event.FocusEvent" handler="fieldIpAddressFocusGained"/>
+                    <EventHandler event="focusLost" listener="java.awt.event.FocusListener" parameters="java.awt.event.FocusEvent" handler="fieldIpAddressFocusLost"/>
+                  </Events>
                 </Component>
                 <Component class="javax.swing.JButton" name="buttonAddPeer">
                   <Properties>
@@ -250,6 +242,9 @@
                     <Property name="horizontalTextPosition" type="int" value="0"/>
                     <Property name="verticalTextPosition" type="int" value="3"/>
                   </Properties>
+                  <Events>
+                    <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="buttonAddPeerActionPerformed"/>
+                  </Events>
                 </Component>
               </SubComponents>
             </Container>
@@ -358,7 +353,7 @@
 
                       <Layout class="org.netbeans.modules.form.compat2.layouts.support.JScrollPaneSupportLayout"/>
                       <SubComponents>
-                        <Component class="javax.swing.JTextArea" name="textareaMessage">
+                        <Component class="javax.swing.JTextArea" name="taMessageLog">
                           <Properties>
                             <Property name="editable" type="boolean" value="false"/>
                             <Property name="columns" type="int" value="20"/>
@@ -385,7 +380,7 @@
                             <EventHandler event="focusLost" listener="java.awt.event.FocusListener" parameters="java.awt.event.FocusEvent" handler="fieldMessageFocusLost"/>
                           </Events>
                         </Component>
-                        <Component class="javax.swing.JSpinner" name="spinnerMtu">
+                        <Component class="javax.swing.JSpinner" name="fieldMtu">
                           <Properties>
                             <Property name="minimumSize" type="java.awt.Dimension" editor="org.netbeans.beaninfo.editors.DimensionEditor">
                               <Dimension value="[80, 28]"/>
@@ -450,7 +445,7 @@
 
                       <Layout class="org.netbeans.modules.form.compat2.layouts.support.JScrollPaneSupportLayout"/>
                       <SubComponents>
-                        <Component class="javax.swing.JTextArea" name="textareaLog">
+                        <Component class="javax.swing.JTextArea" name="taApplicationLog">
                           <Properties>
                             <Property name="editable" type="boolean" value="false"/>
                             <Property name="columns" type="int" value="20"/>

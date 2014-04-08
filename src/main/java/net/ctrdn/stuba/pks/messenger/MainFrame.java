@@ -2,174 +2,24 @@ package net.ctrdn.stuba.pks.messenger;
 
 import com.google.common.base.Preconditions;
 import java.awt.Window;
-import java.io.UnsupportedEncodingException;
 import java.lang.reflect.Method;
+import java.net.Inet4Address;
 import java.net.InetAddress;
-import java.net.NetworkInterface;
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.List;
-import java.util.Map;
-import java.util.Random;
-import java.util.concurrent.ConcurrentHashMap;
+import java.net.UnknownHostException;
 import javax.swing.DefaultComboBoxModel;
-import javax.swing.DefaultListModel;
 import javax.swing.JOptionPane;
 import javax.swing.text.DefaultCaret;
 import net.ctrdn.stuba.pks.messenger.exception.InitializationException;
 import net.ctrdn.stuba.pks.messenger.exception.ListenerException;
-import net.ctrdn.stuba.pks.messenger.exception.MessageException;
 import net.ctrdn.stuba.pks.messenger.exception.UserInterfaceException;
-import net.ctrdn.stuba.pks.messenger.net.Listener;
-import net.ctrdn.stuba.pks.messenger.net.ListenerEventCallback;
-import net.ctrdn.stuba.pks.messenger.net.ListenerMode;
-import net.ctrdn.stuba.pks.messenger.net.Message;
+import net.ctrdn.stuba.pks.messenger.net.listener.Listener;
+import net.ctrdn.stuba.pks.messenger.net.listener.ListenerMode;
 import net.ctrdn.stuba.pks.messenger.net.PeerIdentity;
 import net.ctrdn.stuba.pks.messenger.net.PeerStatus;
 
 public class MainFrame extends javax.swing.JFrame {
 
-    private class ListenerEventCallbackImpl implements ListenerEventCallback {
-
-        private final MainFrame mf = MainFrame.this;
-        private final List<PeerIdentity> peerIdentityList = new ArrayList<>();
-        private final Map<PeerIdentity, Date> peerIdentityLastIdentMap = new ConcurrentHashMap<>();
-
-        @Override
-        public void onListenerStarted(ListenerMode mode) {
-            mf.comboMode.setEnabled(false);
-            mf.fieldPort.setEnabled(false);
-            mf.fieldIdentity.setEnabled(false);
-            mf.buttonControl.setText("Stop");
-            mf.labelStatus.setText("Running (" + mode.toString() + ")");
-            mf.labelAddress.setText("0.0.0.0:" + mf.fieldPort.getText());
-            mf.logMessage("[Listener] Listener has started in mode " + mode.toString() + " on 0.0.0.0:" + mf.fieldPort.getText() + " with identifier " + mf.listener.getLocalIdentity().getIdentifier());
-
-            if (mode == ListenerMode.CLIENT) {
-                mf.fieldMessage.setEnabled(true);
-                mf.spinnerMtu.setEnabled(true);
-                mf.buttonSend.setEnabled(true);
-            }
-        }
-
-        @Override
-        public void onListenerStopped() {
-            mf.comboMode.setEnabled(true);
-            mf.fieldPort.setEnabled(true);
-            mf.fieldIdentity.setEnabled(true);
-            mf.buttonControl.setText("Start");
-            mf.labelStatus.setText("Stopped");
-            mf.labelAddress.setText("-");
-            mf.logMessage("[Listener] Listener has been stopped");
-            mf.listener = null;
-            mf.listReceivers.setModel(new DefaultListModel());
-
-            mf.fieldMessage.setEnabled(false);
-            mf.spinnerMtu.setEnabled(false);
-            mf.buttonSend.setEnabled(false);
-        }
-
-        @Override
-        public void onListenerTick() {
-            boolean updateNeeded = false;
-            Date currentDate = new Date();
-            for (Map.Entry<PeerIdentity, Date> entry : this.peerIdentityLastIdentMap.entrySet()) {
-                if (currentDate.getTime() - entry.getValue().getTime() > 30000) {
-                    mf.logMessage("[Listener] Peer " + entry.getKey().getInetAddress().getHostAddress() + ":" + entry.getKey().getPort() + " did not send identity packet in 30 seconds - removing");
-                    this.peerIdentityList.remove(entry.getKey());
-                    this.peerIdentityLastIdentMap.remove(entry.getKey());
-                    updateNeeded = true;
-                }
-            }
-            if (updateNeeded) {
-                this.reloadReceiverList();
-            }
-        }
-
-        @Override
-        public void onIdentityBroadcastReceived(PeerIdentity peerIdentity) {
-            mf.logMessage("[Listener] Identity packet received (address=" + peerIdentity.getInetAddress().getHostAddress() + ", port=" + peerIdentity.getPort() + ", ident=" + peerIdentity.getIdentifier() + ", name=" + peerIdentity.getPeerName() + ", mode=" + peerIdentity.getListenerMode().toString() + " status=" + peerIdentity.getPeerStatus().toString() + ")");
-            if (peerIdentity.getIdentifier() == mf.listener.getLocalIdentity().getIdentifier()) {
-                mf.logMessage("[Listener] Identity from self - ignored");
-                return;
-            }
-            boolean updateNeeded = false;
-            PeerIdentity foundPeerIdentity = null;
-            for (PeerIdentity currentId : this.peerIdentityList) {
-                if (currentId.getIdentifier() == peerIdentity.getIdentifier()) {
-                    foundPeerIdentity = currentId;
-                    break;
-                }
-            }
-            if (foundPeerIdentity != null && peerIdentity.getPeerStatus() == PeerStatus.LEAVING) {
-                this.peerIdentityList.remove(foundPeerIdentity);
-                this.peerIdentityLastIdentMap.remove(foundPeerIdentity);
-                updateNeeded = true;
-            } else if (foundPeerIdentity == null) {
-                this.peerIdentityList.add(peerIdentity);
-                this.peerIdentityLastIdentMap.put(peerIdentity, new Date());
-                updateNeeded = true;
-            } else {
-                this.peerIdentityLastIdentMap.remove(foundPeerIdentity);
-                this.peerIdentityLastIdentMap.put(foundPeerIdentity, new Date());
-            }
-            if (updateNeeded) {
-                this.reloadReceiverList();
-            }
-        }
-
-        @Override
-        public void onMessageReceived(Message message) {
-            try {
-                PeerIdentity foundId = null;
-                for (PeerIdentity currentIdentity : this.peerIdentityList) {
-                    if (currentIdentity.getInetAddress().equals(message.getSenderAddress()) && currentIdentity.getPort() == message.getSenderPort()) {
-                        foundId = currentIdentity;
-                        break;
-                    }
-                }
-                String appendLines = "[Received message from ";
-                appendLines += ((foundId == null) ? "_unknown_ (" : foundId.getPeerName() + " (");
-                appendLines += message.getSenderAddress().getHostAddress() + ":" + message.getSenderPort() + ", ";
-                appendLines += ((message.getReceivedFrameCount() == message.getTotalFragmentCount()) ? "C" : "I");
-                appendLines += ", " + message.getReceivedFrameCount() + " of " + message.getTotalFragmentCount() + " fragments" + "]\n";
-                appendLines += new String(message.getMessage()) + "\n\n";
-
-                mf.textareaMessage.append(appendLines);
-            } catch (MessageException ex) {
-                mf.handleException(ex);
-            }
-        }
-
-        @Override
-        public void onListenerLogEvent(String message) {
-            mf.logMessage("[Listener] " + message);
-        }
-
-        private void reloadReceiverList() {
-            try {
-                String selectedItem = (String) mf.listReceivers.getSelectedValue();
-                boolean selectedItemFound = false;
-                DefaultListModel cmodel = new DefaultListModel();
-                for (PeerIdentity listingId : this.peerIdentityList) {
-                    String newObj = "(" + ((listingId.getListenerMode() == ListenerMode.CLIENT) ? "C" : "S") + ") " + new String(listingId.getPeerName().getBytes("UTF-8")) + " (" + listingId.getInetAddress().getHostAddress() + ":" + listingId.getPort() + ")";
-                    cmodel.addElement(newObj);
-                    if (newObj.equals(selectedItem)) {
-                        selectedItemFound = true;
-                    }
-                }
-                mf.listReceivers.setModel(cmodel);
-                if (selectedItemFound) {
-                    mf.listReceivers.setSelectedValue(selectedItem, true);
-                }
-            } catch (UnsupportedEncodingException ex) {
-                mf.handleException(ex);
-            }
-        }
-    }
-
-    private ListenerEventCallbackImpl listenerCallback;
-    private final List<NetworkInterface> networkInterfaceList = new ArrayList<>();
+    private DefaultListenerCallback listenerCallback;
     private Listener listener = null;
 
     @SuppressWarnings({"unchecked", "rawtypes"})
@@ -193,11 +43,11 @@ public class MainFrame extends javax.swing.JFrame {
         initComponents();
     }
 
-    private void logMessage(String message) {
-        this.textareaLog.append(message + "\n");
+    protected void logMessage(String message) {
+        this.getTaApplicationLog().append(message + "\n");
     }
 
-    private void handleException(Throwable thrwbl) {
+    protected void handleException(Throwable thrwbl) {
         if (UserInterfaceException.class.isAssignableFrom(thrwbl.getClass())) {
             JOptionPane.showMessageDialog(null, thrwbl.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
         } else {
@@ -205,41 +55,35 @@ public class MainFrame extends javax.swing.JFrame {
         }
     }
 
-    private void enumerateModes() {
+    public void initialize() {
         DefaultComboBoxModel modeComboModel = new DefaultComboBoxModel();
         modeComboModel.addElement("Server (Receiver)");
         modeComboModel.addElement("Client (Transmitter)");
-        this.comboMode.setModel(modeComboModel);
+        this.getComboBoxMode().setModel(modeComboModel);
+        this.getFieldMessage().setEnabled(false);
+        this.getButtonSend().setEnabled(false);
+        this.getFieldMtu().setEnabled(false);
+        this.getFieldMtu().setValue(64);
+        this.fieldIpAddress.setEnabled(false);
+        this.buttonAddPeer.setEnabled(false);
+        DefaultCaret taLogCaret = (DefaultCaret) this.getTaApplicationLog().getCaret();
+        taLogCaret.setUpdatePolicy(DefaultCaret.ALWAYS_UPDATE);
+        DefaultCaret taRecvCaret = (DefaultCaret) this.getTaMessageLog().getCaret();
+        taRecvCaret.setUpdatePolicy(DefaultCaret.ALWAYS_UPDATE);
     }
 
-    public void initialize() {
-        this.enumerateModes();
-
-        this.fieldMessage.setEnabled(false);
-        this.buttonSend.setEnabled(false);
-        this.spinnerMtu.setEnabled(false);
-        this.spinnerMtu.setValue(64);
-
-        DefaultCaret taLogCaret = (DefaultCaret) this.textareaLog.getCaret();
-        taLogCaret.setUpdatePolicy(DefaultCaret.ALWAYS_UPDATE);
-
-        DefaultCaret taRecvCaret = (DefaultCaret) this.textareaMessage.getCaret();
-        taRecvCaret.setUpdatePolicy(DefaultCaret.ALWAYS_UPDATE);
+    public void removeListener() {
+        this.listener = null;
     }
 
     @SuppressWarnings("unchecked")
     // <editor-fold defaultstate="collapsed" desc="Generated Code">//GEN-BEGIN:initComponents
     private void initComponents() {
 
-        buttonGroup1 = new javax.swing.ButtonGroup();
-        buttonGroup2 = new javax.swing.ButtonGroup();
-        buttonGroup3 = new javax.swing.ButtonGroup();
-        buttonGroup4 = new javax.swing.ButtonGroup();
-        buttonGroup5 = new javax.swing.ButtonGroup();
         jSplitPane1 = new javax.swing.JSplitPane();
         jPanel1 = new javax.swing.JPanel();
         jLabel2 = new javax.swing.JLabel();
-        comboMode = new javax.swing.JComboBox();
+        comboBoxMode = new javax.swing.JComboBox();
         jLabel3 = new javax.swing.JLabel();
         jLabel4 = new javax.swing.JLabel();
         labelStatus = new javax.swing.JLabel();
@@ -247,7 +91,7 @@ public class MainFrame extends javax.swing.JFrame {
         buttonControl = new javax.swing.JButton();
         jLabel5 = new javax.swing.JLabel();
         jScrollPane1 = new javax.swing.JScrollPane();
-        listReceivers = new javax.swing.JList();
+        listNeighbors = new javax.swing.JList();
         jToolBar1 = new javax.swing.JToolBar();
         fieldIpAddress = new javax.swing.JTextField();
         buttonAddPeer = new javax.swing.JButton();
@@ -260,14 +104,14 @@ public class MainFrame extends javax.swing.JFrame {
         jPanel3 = new javax.swing.JPanel();
         jLabel7 = new javax.swing.JLabel();
         jScrollPane2 = new javax.swing.JScrollPane();
-        textareaMessage = new javax.swing.JTextArea();
+        taMessageLog = new javax.swing.JTextArea();
         jToolBar2 = new javax.swing.JToolBar();
         fieldMessage = new javax.swing.JTextField();
-        spinnerMtu = new javax.swing.JSpinner();
+        fieldMtu = new javax.swing.JSpinner();
         buttonSend = new javax.swing.JButton();
         jPanel4 = new javax.swing.JPanel();
         jScrollPane3 = new javax.swing.JScrollPane();
-        textareaLog = new javax.swing.JTextArea();
+        taApplicationLog = new javax.swing.JTextArea();
         jLabel8 = new javax.swing.JLabel();
 
         setDefaultCloseOperation(javax.swing.WindowConstants.EXIT_ON_CLOSE);
@@ -278,7 +122,7 @@ public class MainFrame extends javax.swing.JFrame {
 
         jLabel2.setText("Mode:");
 
-        comboMode.setModel(new javax.swing.DefaultComboBoxModel(new String[] { "Item 1", "Item 2", "Item 3", "Item 4" }));
+        comboBoxMode.setModel(new javax.swing.DefaultComboBoxModel(new String[] { "Item 1", "Item 2", "Item 3", "Item 4" }));
 
         jLabel3.setFont(new java.awt.Font("Lucida Grande", 1, 13)); // NOI18N
         jLabel3.setText("Status:");
@@ -299,23 +143,36 @@ public class MainFrame extends javax.swing.JFrame {
 
         jLabel5.setText("Neighbors:");
 
-        listReceivers.setModel(new javax.swing.AbstractListModel() {
+        listNeighbors.setModel(new javax.swing.AbstractListModel() {
             String[] strings = { };
             public int getSize() { return strings.length; }
             public Object getElementAt(int i) { return strings[i]; }
         });
-        jScrollPane1.setViewportView(listReceivers);
+        jScrollPane1.setViewportView(listNeighbors);
 
         jToolBar1.setFloatable(false);
         jToolBar1.setRollover(true);
 
-        fieldIpAddress.setText("enter IPv4 address");
+        fieldIpAddress.setText("enter ip:port to add server...");
+        fieldIpAddress.addFocusListener(new java.awt.event.FocusAdapter() {
+            public void focusGained(java.awt.event.FocusEvent evt) {
+                fieldIpAddressFocusGained(evt);
+            }
+            public void focusLost(java.awt.event.FocusEvent evt) {
+                fieldIpAddressFocusLost(evt);
+            }
+        });
         jToolBar1.add(fieldIpAddress);
 
         buttonAddPeer.setText("Add...");
         buttonAddPeer.setFocusable(false);
         buttonAddPeer.setHorizontalTextPosition(javax.swing.SwingConstants.CENTER);
         buttonAddPeer.setVerticalTextPosition(javax.swing.SwingConstants.BOTTOM);
+        buttonAddPeer.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                buttonAddPeerActionPerformed(evt);
+            }
+        });
         jToolBar1.add(buttonAddPeer);
 
         jLabel6.setText("UDP port:");
@@ -344,7 +201,7 @@ public class MainFrame extends javax.swing.JFrame {
                             .addGroup(jPanel1Layout.createSequentialGroup()
                                 .addComponent(jLabel2)
                                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                                .addComponent(comboMode, 0, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
+                                .addComponent(comboBoxMode, 0, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
                             .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, jPanel1Layout.createSequentialGroup()
                                 .addGap(0, 0, Short.MAX_VALUE)
                                 .addComponent(buttonControl))
@@ -372,7 +229,7 @@ public class MainFrame extends javax.swing.JFrame {
                 .addContainerGap()
                 .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
                     .addComponent(jLabel2)
-                    .addComponent(comboMode, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
+                    .addComponent(comboBoxMode, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                 .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
                     .addComponent(jLabel6)
@@ -409,11 +266,11 @@ public class MainFrame extends javax.swing.JFrame {
 
         jLabel7.setText("Message Log");
 
-        textareaMessage.setEditable(false);
-        textareaMessage.setColumns(20);
-        textareaMessage.setLineWrap(true);
-        textareaMessage.setRows(5);
-        jScrollPane2.setViewportView(textareaMessage);
+        taMessageLog.setEditable(false);
+        taMessageLog.setColumns(20);
+        taMessageLog.setLineWrap(true);
+        taMessageLog.setRows(5);
+        jScrollPane2.setViewportView(taMessageLog);
 
         jToolBar2.setFloatable(false);
         jToolBar2.setRollover(true);
@@ -429,9 +286,9 @@ public class MainFrame extends javax.swing.JFrame {
         });
         jToolBar2.add(fieldMessage);
 
-        spinnerMtu.setMinimumSize(new java.awt.Dimension(80, 28));
-        spinnerMtu.setPreferredSize(new java.awt.Dimension(80, 28));
-        jToolBar2.add(spinnerMtu);
+        fieldMtu.setMinimumSize(new java.awt.Dimension(80, 28));
+        fieldMtu.setPreferredSize(new java.awt.Dimension(80, 28));
+        jToolBar2.add(fieldMtu);
 
         buttonSend.setText("Send...");
         buttonSend.setFocusable(false);
@@ -471,10 +328,10 @@ public class MainFrame extends javax.swing.JFrame {
 
         jSplitPane2.setTopComponent(jPanel3);
 
-        textareaLog.setEditable(false);
-        textareaLog.setColumns(20);
-        textareaLog.setRows(5);
-        jScrollPane3.setViewportView(textareaLog);
+        taApplicationLog.setEditable(false);
+        taApplicationLog.setColumns(20);
+        taApplicationLog.setRows(5);
+        jScrollPane3.setViewportView(taApplicationLog);
 
         jLabel8.setText("Application Log");
 
@@ -529,76 +386,38 @@ public class MainFrame extends javax.swing.JFrame {
     }// </editor-fold>//GEN-END:initComponents
 
     private void buttonControlActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_buttonControlActionPerformed
-        if (this.listener == null) {
-            final ListenerMode mode = (((String) this.comboMode.getSelectedItem()).startsWith("Server")) ? ListenerMode.SERVER : ListenerMode.CLIENT;
-            final String localName = this.fieldIdentity.getText();
-            final int localPort = Integer.parseInt(this.fieldPort.getText());
-            final long finalIdent = new Random(new Date().getTime()).nextLong();
-
-            PeerIdentity localIdentity = new PeerIdentity() {
-
-                @Override
-                public InetAddress getInetAddress() {
-                    return null;
-                }
-
-                @Override
-                public int getPort() {
-                    return localPort;
-                }
-
-                @Override
-                public PeerStatus getPeerStatus() {
-                    return PeerStatus.ACTIVE;
-                }
-
-                @Override
-                public String getPeerName() {
-                    return localName;
-                }
-
-                @Override
-                public ListenerMode getListenerMode() {
-                    return mode;
-                }
-
-                @Override
-                public long getIdentifier() {
-                    return finalIdent;
-                }
-            };
-
+        if (this.getListener() == null) {
             try {
-                this.listenerCallback = new ListenerEventCallbackImpl();
-                this.listener = new Listener(localIdentity, mode);
-                this.listener.addEventCallback(this.listenerCallback);
-                new Thread(this.listener).start();
+                this.listenerCallback = new DefaultListenerCallback(this);
+                this.listener = new Listener(Helpers.getLocalIdentity(this));
+                this.getListener().addCallback(this.listenerCallback);
+                new Thread(this.getListener()).start();
             } catch (ListenerException ex) {
                 this.handleException(ex);
             }
         } else {
-            this.listener.stop();
+            this.getListener().stop();
         }
     }//GEN-LAST:event_buttonControlActionPerformed
 
     private void buttonSendActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_buttonSendActionPerformed
         try {
-            if (this.listener == null || this.listener.getMode() != ListenerMode.CLIENT) {
+            if (this.getListener() == null || this.getListener().getLocalIdentity().getListenerMode() != ListenerMode.CLIENT) {
                 throw new UserInterfaceException("Listener is not started or not running in client mode.");
             }
-            if (this.listReceivers.getSelectedIndex() < 0 || this.listReceivers.getSelectedIndex() >= this.listenerCallback.peerIdentityList.size()) {
+            if (this.getListNeighbors().getSelectedIndex() < 0 || this.getListNeighbors().getSelectedIndex() >= this.listenerCallback.getPeerIdentityList().size()) {
                 throw new UserInterfaceException("Invalid target selection.");
             }
-            PeerIdentity target = this.listenerCallback.peerIdentityList.get(this.listReceivers.getSelectedIndex());
+            PeerIdentity target = this.listenerCallback.getPeerIdentityList().get(this.getListNeighbors().getSelectedIndex());
             if (target.getListenerMode() == ListenerMode.CLIENT) {
                 throw new UserInterfaceException("You cannot send message to client (C), only to server (S).");
             }
-            int fragments = this.listener.sendMessage(target, (Integer) this.spinnerMtu.getValue(), this.fieldMessage.getText());
-            this.textareaMessage.append("[Sent message to " + target.getPeerName() + " (" + target.getInetAddress().getHostAddress() + ":" + target.getPort() + ") in " + fragments + " fragments]\n" + this.fieldMessage.getText() + "\n\n");
-            if (this.fieldMessage.isFocusOwner()) {
-                this.fieldMessage.setText("");
+            int fragments = this.getListener().sendMessage(target, (Integer) this.getFieldMtu().getValue(), this.getFieldMessage().getText());
+            this.getTaMessageLog().append("[Sent message to " + target.getPeerName() + " (" + target.getInetAddress().getHostAddress() + ":" + target.getPort() + ") in " + fragments + " fragments]\n" + this.getFieldMessage().getText() + "\n\n");
+            if (this.getFieldMessage().isFocusOwner()) {
+                this.getFieldMessage().setText("");
             } else {
-                this.fieldMessage.setText("enter message here...");
+                this.getFieldMessage().setText("enter message here...");
             }
         } catch (UserInterfaceException | ListenerException ex) {
             this.handleException(ex);
@@ -606,31 +425,81 @@ public class MainFrame extends javax.swing.JFrame {
     }//GEN-LAST:event_buttonSendActionPerformed
 
     private void fieldMessageFocusGained(java.awt.event.FocusEvent evt) {//GEN-FIRST:event_fieldMessageFocusGained
-        if (this.fieldMessage.getText().equals("enter message here...")) {
-            this.fieldMessage.setText("");
+        if (this.getFieldMessage().getText().equals("enter message here...")) {
+            this.getFieldMessage().setText("");
         }
     }//GEN-LAST:event_fieldMessageFocusGained
 
     private void fieldMessageFocusLost(java.awt.event.FocusEvent evt) {//GEN-FIRST:event_fieldMessageFocusLost
-        if (this.fieldMessage.getText().equals("")) {
-            this.fieldMessage.setText("enter message here...");
+        if (this.getFieldMessage().getText().equals("")) {
+            this.getFieldMessage().setText("enter message here...");
         }
     }//GEN-LAST:event_fieldMessageFocusLost
+
+    private void buttonAddPeerActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_buttonAddPeerActionPerformed
+        try {
+            String[] addrSplit = this.fieldIpAddress.getText().split(":");
+            final InetAddress peerAddress = Inet4Address.getByName(addrSplit[0]);
+            final int peerPort = (addrSplit.length == 1) ? this.getListener().getLocalIdentity().getPort() : Integer.parseInt(addrSplit[1]);
+            this.listenerCallback.addStaticPeerIdentity(new PeerIdentity() {
+
+                @Override
+                public long getIdentifier() {
+                    return 0;
+                }
+
+                @Override
+                public ListenerMode getListenerMode() {
+                    return ListenerMode.SERVER;
+                }
+
+                @Override
+                public InetAddress getInetAddress() {
+                    return peerAddress;
+                }
+
+                @Override
+                public int getPort() {
+                    return peerPort;
+                }
+
+                @Override
+                public PeerStatus getPeerStatus() {
+                    return null;
+                }
+
+                @Override
+                public String getPeerName() {
+                    return "[Custom peer]";
+                }
+            });
+        } catch (UnknownHostException ex) {
+            this.handleException(ex);
+        }
+    }//GEN-LAST:event_buttonAddPeerActionPerformed
+
+    private void fieldIpAddressFocusGained(java.awt.event.FocusEvent evt) {//GEN-FIRST:event_fieldIpAddressFocusGained
+        if (this.fieldIpAddress.getText().equals("enter ip:port to add server...")) {
+            this.fieldIpAddress.setText("");
+        }
+    }//GEN-LAST:event_fieldIpAddressFocusGained
+
+    private void fieldIpAddressFocusLost(java.awt.event.FocusEvent evt) {//GEN-FIRST:event_fieldIpAddressFocusLost
+        if (this.fieldIpAddress.getText().equals("")) {
+            this.fieldIpAddress.setText("enter ip:port to add server...");
+        }
+    }//GEN-LAST:event_fieldIpAddressFocusLost
 
 
     // Variables declaration - do not modify//GEN-BEGIN:variables
     private javax.swing.JButton buttonAddPeer;
     private javax.swing.JButton buttonControl;
-    private javax.swing.ButtonGroup buttonGroup1;
-    private javax.swing.ButtonGroup buttonGroup2;
-    private javax.swing.ButtonGroup buttonGroup3;
-    private javax.swing.ButtonGroup buttonGroup4;
-    private javax.swing.ButtonGroup buttonGroup5;
     private javax.swing.JButton buttonSend;
-    private javax.swing.JComboBox comboMode;
+    private javax.swing.JComboBox comboBoxMode;
     private javax.swing.JTextField fieldIdentity;
     private javax.swing.JTextField fieldIpAddress;
     private javax.swing.JTextField fieldMessage;
+    private javax.swing.JSpinner fieldMtu;
     private javax.swing.JTextField fieldPort;
     private javax.swing.JLabel jLabel2;
     private javax.swing.JLabel jLabel3;
@@ -653,9 +522,68 @@ public class MainFrame extends javax.swing.JFrame {
     private javax.swing.JToolBar jToolBar2;
     private javax.swing.JLabel labelAddress;
     private javax.swing.JLabel labelStatus;
-    private javax.swing.JList listReceivers;
-    private javax.swing.JSpinner spinnerMtu;
-    private javax.swing.JTextArea textareaLog;
-    private javax.swing.JTextArea textareaMessage;
+    private javax.swing.JList listNeighbors;
+    private javax.swing.JTextArea taApplicationLog;
+    private javax.swing.JTextArea taMessageLog;
     // End of variables declaration//GEN-END:variables
+
+    public javax.swing.JComboBox getComboBoxMode() {
+        return comboBoxMode;
+    }
+
+    public javax.swing.JTextField getFieldIdentity() {
+        return fieldIdentity;
+    }
+
+    public javax.swing.JTextField getFieldIpAddress() {
+        return fieldIpAddress;
+    }
+
+    public javax.swing.JTextField getFieldMessage() {
+        return fieldMessage;
+    }
+
+    public javax.swing.JSpinner getFieldMtu() {
+        return fieldMtu;
+    }
+
+    public javax.swing.JTextField getFieldPort() {
+        return fieldPort;
+    }
+
+    public javax.swing.JLabel getLabelAddress() {
+        return labelAddress;
+    }
+
+    public javax.swing.JLabel getLabelStatus() {
+        return labelStatus;
+    }
+
+    public javax.swing.JList getListNeighbors() {
+        return listNeighbors;
+    }
+
+    public javax.swing.JTextArea getTaApplicationLog() {
+        return taApplicationLog;
+    }
+
+    public javax.swing.JTextArea getTaMessageLog() {
+        return taMessageLog;
+    }
+
+    public javax.swing.JButton getButtonAddPeer() {
+        return buttonAddPeer;
+    }
+
+    public javax.swing.JButton getButtonControl() {
+        return buttonControl;
+    }
+
+    public javax.swing.JButton getButtonSend() {
+        return buttonSend;
+    }
+
+    public Listener getListener() {
+        return listener;
+    }
 }
