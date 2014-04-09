@@ -1,6 +1,5 @@
 package net.ctrdn.stuba.pks.messenger;
 
-import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
@@ -140,23 +139,18 @@ public class DefaultListenerCallback implements ListenerCallback {
     }
 
     private void reloadReceiverList() {
-        try {
-            String selectedItem = (String) mainFrame.getListNeighbors().getSelectedValue();
-            boolean selectedItemFound = false;
-            DefaultListModel cmodel = new DefaultListModel();
-            for (PeerIdentity listingId : this.peerIdentityList) {
-                String newObj = "(" + ((listingId.getListenerMode() == ListenerMode.CLIENT) ? "C" : "S") + ") " + new String(listingId.getPeerName().getBytes("UTF-8")) + " (" + listingId.getInetAddress().getHostAddress() + ":" + listingId.getPort() + ")";
-                cmodel.addElement(newObj);
-                if (newObj.equals(selectedItem)) {
-                    selectedItemFound = true;
-                }
+        String selectedItem = (String) mainFrame.getListNeighbors().getSelectedValue();
+        boolean selectedItemFound = false;
+        DefaultListModel cmodel = new DefaultListModel();
+        for (PeerIdentity listingId : this.peerIdentityList) {
+            cmodel.addElement(listingId);
+            if (listingId.equals(selectedItem)) {
+                selectedItemFound = true;
             }
-            mainFrame.getListNeighbors().setModel(cmodel);
-            if (selectedItemFound) {
-                mainFrame.getListNeighbors().setSelectedValue(selectedItem, true);
-            }
-        } catch (UnsupportedEncodingException ex) {
-            mainFrame.handleException(ex);
+        }
+        mainFrame.getListNeighbors().setModel(cmodel);
+        if (selectedItemFound) {
+            mainFrame.getListNeighbors().setSelectedValue(selectedItem, true);
         }
     }
 

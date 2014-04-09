@@ -20,6 +20,7 @@ import java.util.Random;
 import net.ctrdn.stuba.pks.messenger.Helpers;
 import net.ctrdn.stuba.pks.messenger.exception.ListenerException;
 import net.ctrdn.stuba.pks.messenger.exception.MessageException;
+import net.ctrdn.stuba.pks.messenger.net.DefaultPeerIdentity;
 import net.ctrdn.stuba.pks.messenger.net.message.Message;
 import net.ctrdn.stuba.pks.messenger.net.message.MessageImpl;
 import net.ctrdn.stuba.pks.messenger.net.PeerIdentity;
@@ -109,38 +110,7 @@ public class Listener implements Runnable {
                                 final InetAddress peerInetAddress = recvPacket.getAddress();
                                 final int peerPort = recvPacket.getPort();
 
-                                final PeerIdentity remoteIdentity = new PeerIdentity() {
-
-                                    @Override
-                                    public InetAddress getInetAddress() {
-                                        return peerInetAddress;
-                                    }
-
-                                    @Override
-                                    public int getPort() {
-                                        return peerPort;
-                                    }
-
-                                    @Override
-                                    public PeerStatus getPeerStatus() {
-                                        return peerStatus;
-                                    }
-
-                                    @Override
-                                    public String getPeerName() {
-                                        return peerName;
-                                    }
-
-                                    @Override
-                                    public ListenerMode getListenerMode() {
-                                        return peerListenerMode;
-                                    }
-
-                                    @Override
-                                    public long getIdentifier() {
-                                        return peerIdentifier;
-                                    }
-                                };
+                                final PeerIdentity remoteIdentity = new DefaultPeerIdentity(peerIdentifier, peerListenerMode, peerStatus, peerInetAddress, peerPort, peerName);
                                 for (ListenerCallback callback : this.eventCallbackList) {
                                     callback.onIdentityBroadcastReceived(this, remoteIdentity);
                                 }

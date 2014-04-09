@@ -12,6 +12,7 @@ import javax.swing.text.DefaultCaret;
 import net.ctrdn.stuba.pks.messenger.exception.InitializationException;
 import net.ctrdn.stuba.pks.messenger.exception.ListenerException;
 import net.ctrdn.stuba.pks.messenger.exception.UserInterfaceException;
+import net.ctrdn.stuba.pks.messenger.net.DefaultPeerIdentity;
 import net.ctrdn.stuba.pks.messenger.net.listener.Listener;
 import net.ctrdn.stuba.pks.messenger.net.listener.ListenerMode;
 import net.ctrdn.stuba.pks.messenger.net.PeerIdentity;
@@ -405,10 +406,10 @@ public class MainFrame extends javax.swing.JFrame {
             if (this.getListener() == null || this.getListener().getLocalIdentity().getListenerMode() != ListenerMode.CLIENT) {
                 throw new UserInterfaceException("Listener is not started or not running in client mode.");
             }
-            if (this.getListNeighbors().getSelectedIndex() < 0 || this.getListNeighbors().getSelectedIndex() >= this.listenerCallback.getPeerIdentityList().size()) {
+            if (this.getListNeighbors().getSelectedValue() == null) {
                 throw new UserInterfaceException("Invalid target selection.");
             }
-            PeerIdentity target = this.listenerCallback.getPeerIdentityList().get(this.getListNeighbors().getSelectedIndex());
+            PeerIdentity target = (PeerIdentity) this.getListNeighbors().getSelectedValue();
             if (target.getListenerMode() == ListenerMode.CLIENT) {
                 throw new UserInterfaceException("You cannot send message to client (C), only to server (S).");
             }
@@ -441,38 +442,7 @@ public class MainFrame extends javax.swing.JFrame {
             String[] addrSplit = this.fieldIpAddress.getText().split(":");
             final InetAddress peerAddress = Inet4Address.getByName(addrSplit[0]);
             final int peerPort = (addrSplit.length == 1) ? this.getListener().getLocalIdentity().getPort() : Integer.parseInt(addrSplit[1]);
-            this.listenerCallback.addStaticPeerIdentity(new PeerIdentity() {
-
-                @Override
-                public long getIdentifier() {
-                    return 0;
-                }
-
-                @Override
-                public ListenerMode getListenerMode() {
-                    return ListenerMode.SERVER;
-                }
-
-                @Override
-                public InetAddress getInetAddress() {
-                    return peerAddress;
-                }
-
-                @Override
-                public int getPort() {
-                    return peerPort;
-                }
-
-                @Override
-                public PeerStatus getPeerStatus() {
-                    return null;
-                }
-
-                @Override
-                public String getPeerName() {
-                    return "[Custom peer]";
-                }
-            });
+            this.listenerCallback.addStaticPeerIdentity(new DefaultPeerIdentity(0, ListenerMode.SERVER, PeerStatus.ACTIVE, peerAddress, peerPort, "[Custom Entry]"));
         } catch (UnknownHostException ex) {
             this.handleException(ex);
         }
