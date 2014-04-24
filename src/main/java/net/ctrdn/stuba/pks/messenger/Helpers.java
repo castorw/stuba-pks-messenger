@@ -20,7 +20,7 @@ public class Helpers {
     }
 
     public static final PeerIdentity getLocalIdentity(MainFrame mf) {
-        final ListenerMode mode = (((String) mf.getComboBoxMode().getSelectedItem()).startsWith("Server")) ? ListenerMode.SERVER : ListenerMode.CLIENT;
+        final ListenerMode mode = (((String) mf.getComboBoxMode().getSelectedItem()).startsWith("Receiver")) ? ListenerMode.RECEIVER : ListenerMode.TRANSMITTER;
         final String localName = mf.getFieldIdentity().getText();
         final int localPort = Integer.parseInt(mf.getFieldPort().getText());
         final long finalIdent = new Random(new Date().getTime()).nextLong();

@@ -99,7 +99,7 @@ public class Listener implements Runnable {
                             case ProtocolConstants.MSG_TYPE_IDENTITY: {
                                 ByteBuffer wrapped = ByteBuffer.wrap(recvPacket.getData(), 1, Long.SIZE / 8 + 3);
                                 final long peerIdentifier = wrapped.getLong();
-                                final ListenerMode peerListenerMode = (wrapped.get() == ProtocolConstants.IDENTITY_CLIENT) ? ListenerMode.CLIENT : ListenerMode.SERVER;
+                                final ListenerMode peerListenerMode = (wrapped.get() == ProtocolConstants.IDENTITY_CLIENT) ? ListenerMode.TRANSMITTER : ListenerMode.RECEIVER;
                                 final PeerStatus peerStatus = (wrapped.get() == ProtocolConstants.IDENTITY_LEAVING) ? PeerStatus.LEAVING : PeerStatus.ACTIVE;
                                 int nameLen = wrapped.get();
                                 StringBuilder peerNameSB = new StringBuilder();
@@ -117,7 +117,7 @@ public class Listener implements Runnable {
                                 break;
                             }
                             case ProtocolConstants.MSG_TYPE_MESSAGE: {
-                                if (this.getLocalIdentity().getListenerMode() == ListenerMode.CLIENT) {
+                                if (this.getLocalIdentity().getListenerMode() == ListenerMode.TRANSMITTER) {
                                     this.logMessage("Cannot received message in client mode (message from " + recvPacket.getAddress().getHostAddress() + ":" + recvPacket.getPort() + ")");
                                     break;
                                 }
@@ -179,7 +179,7 @@ public class Listener implements Runnable {
     }
 
     public int sendMessage(PeerIdentity target, int mtu, String message) throws ListenerException {
-        if (this.getLocalIdentity().getListenerMode() != ListenerMode.CLIENT) {
+        if (this.getLocalIdentity().getListenerMode() != ListenerMode.TRANSMITTER) {
             throw new ListenerException("Messages can be only sent in client mode");
         }
         try {
@@ -230,7 +230,7 @@ public class Listener implements Runnable {
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         baos.write(ProtocolConstants.MSG_TYPE_IDENTITY);
         baos.write(identifierBytes, 0, identifierBytes.length);
-        baos.write((this.getLocalIdentity().getListenerMode() == ListenerMode.CLIENT) ? ProtocolConstants.IDENTITY_CLIENT : ProtocolConstants.IDENTITY_SERVER);
+        baos.write((this.getLocalIdentity().getListenerMode() == ListenerMode.TRANSMITTER) ? ProtocolConstants.IDENTITY_CLIENT : ProtocolConstants.IDENTITY_SERVER);
         baos.write((active) ? ProtocolConstants.IDENTITY_ACTIVE : ProtocolConstants.IDENTITY_LEAVING);
         baos.write((byte) this.getLocalIdentity().getPeerName().length());
         baos.write(this.getLocalIdentity().getPeerName().getBytes("UTF-8"), 0, this.getLocalIdentity().getPeerName().getBytes().length);

@@ -36,7 +36,7 @@ public class DefaultListenerCallback implements ListenerCallback {
         mainFrame.getLabelAddress().setText("0.0.0.0:" + mainFrame.getFieldPort().getText());
         mainFrame.logMessage("[Listener] Listener has started in mode " + listener.getLocalIdentity().getListenerMode().toString() + " on 0.0.0.0:" + listener.getLocalIdentity().getPort() + " with identifier " + listener.getLocalIdentity().getIdentifier());
 
-        if (listener.getLocalIdentity().getListenerMode() == ListenerMode.CLIENT) {
+        if (listener.getLocalIdentity().getListenerMode() == ListenerMode.TRANSMITTER) {
             mainFrame.getFieldMessage().setEnabled(true);
             mainFrame.getFieldMtu().setEnabled(true);
             mainFrame.getButtonSend().setEnabled(true);

@@ -53,6 +53,6 @@ public class DefaultPeerIdentity implements PeerIdentity {
 
     @Override
     public String toString() {
-        return "(" + ((this.listenerMode == ListenerMode.CLIENT) ? "C" : "S") + ") " + this.getPeerName() + " (" + this.getInetAddress().getHostAddress() + ":" + this.getPort() + ")";
+        return "(" + ((this.listenerMode == ListenerMode.TRANSMITTER) ? "T" : "R") + ") " + this.getPeerName() + " (" + this.getInetAddress().getHostAddress() + ":" + this.getPort() + ")";
     }
 }

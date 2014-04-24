@@ -58,8 +58,8 @@ public class MainFrame extends javax.swing.JFrame {
 
     public void initialize() {
         DefaultComboBoxModel modeComboModel = new DefaultComboBoxModel();
-        modeComboModel.addElement("Server (Receiver)");
-        modeComboModel.addElement("Client (Transmitter)");
+        modeComboModel.addElement("Receiver");
+        modeComboModel.addElement("Transmitter");
         this.getComboBoxMode().setModel(modeComboModel);
         this.getFieldMessage().setEnabled(false);
         this.getButtonSend().setEnabled(false);
@@ -403,15 +403,15 @@ public class MainFrame extends javax.swing.JFrame {
 
     private void buttonSendActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_buttonSendActionPerformed
         try {
-            if (this.getListener() == null || this.getListener().getLocalIdentity().getListenerMode() != ListenerMode.CLIENT) {
+            if (this.getListener() == null || this.getListener().getLocalIdentity().getListenerMode() != ListenerMode.TRANSMITTER) {
                 throw new UserInterfaceException("Listener is not started or not running in client mode.");
             }
             if (this.getListNeighbors().getSelectedValue() == null) {
                 throw new UserInterfaceException("Invalid target selection.");
             }
             PeerIdentity target = (PeerIdentity) this.getListNeighbors().getSelectedValue();
-            if (target.getListenerMode() == ListenerMode.CLIENT) {
-                throw new UserInterfaceException("You cannot send message to client (C), only to server (S).");
+            if (target.getListenerMode() == ListenerMode.TRANSMITTER) {
+                throw new UserInterfaceException("You cannot send message to client (T), only to server (R).");
             }
             int fragments = this.getListener().sendMessage(target, (Integer) this.getFieldMtu().getValue(), this.getFieldMessage().getText());
             this.getTaMessageLog().append("[Sent message to " + target.getPeerName() + " (" + target.getInetAddress().getHostAddress() + ":" + target.getPort() + ") in " + fragments + " fragments]\n" + this.getFieldMessage().getText() + "\n\n");
@@ -442,7 +442,7 @@ public class MainFrame extends javax.swing.JFrame {
             String[] addrSplit = this.fieldIpAddress.getText().split(":");
             final InetAddress peerAddress = Inet4Address.getByName(addrSplit[0]);
             final int peerPort = (addrSplit.length == 1) ? this.getListener().getLocalIdentity().getPort() : Integer.parseInt(addrSplit[1]);
-            this.listenerCallback.addStaticPeerIdentity(new DefaultPeerIdentity(0, ListenerMode.SERVER, PeerStatus.ACTIVE, peerAddress, peerPort, "[Custom Entry]"));
+            this.listenerCallback.addStaticPeerIdentity(new DefaultPeerIdentity(0, ListenerMode.RECEIVER, PeerStatus.ACTIVE, peerAddress, peerPort, "[Custom Entry]"));
         } catch (UnknownHostException ex) {
             this.handleException(ex);
         }
